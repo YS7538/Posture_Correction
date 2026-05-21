@@ -3,6 +3,9 @@ import cv2
 import time
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
+from playsound import playsound
+
+
 
 model_path= "pose_landmarker_full.task"
 
@@ -12,21 +15,40 @@ PoseLandmarkerOptions = mp.tasks.vision.PoseLandmarkerOptions
 PoseLandmarkerResult = mp.tasks.vision.PoseLandmarkerResult
 VisionRunningMode = mp.tasks.vision.RunningMode
 
+posture_status=True #true means good status
+forward_lean=0
+bad_posture_start=None
+alert= False
 # Create a pose landmarker instance with the live stream mode:
 def print_result(result: PoseLandmarkerResult, output_image: mp.Image, timestamp_ms: int):
     if(result.pose_landmarks):
+        global forward_lean,posture_status,bad_posture_start,alert
+        
         person= result.pose_landmarks[0]
         nose= person[0]
         right_ear= person[8]
         left_ear= person[7]
         left_shoulder= person[11]
         right_shoulder= person[12]
-        '''print(nose.x,nose.y)
-        print(right_ear.x,right_ear.y)
-        print(left_ear.x,left_ear.y)
-        print(left_shoulder.x,left_shoulder.y)
-        print(right_shoulder.x,right_shoulder.y)'''
-        print(right_ear.z-right_shoulder.z)
+        
+        side_lean= right_ear.x-right_shoulder.x
+        forward_lean= right_ear.z-right_shoulder.z
+        
+        if forward_lean>-0.10 or forward_lean<-0.30:
+            posture_status=False
+            if bad_posture_start==None:
+                bad_posture_start=time.time()
+                alert=False
+        else:
+            posture_status=True
+            bad_posture_start=None
+            alert=False
+        
+        if bad_posture_start is not None:
+            elapsed= time.time()- bad_posture_start
+            if elapsed>4 and not alert:
+                playsound("D:/Projects/Posture_Correction/beep.mp3")
+                alert=True
     #print('pose landmarker result: {}'.format(result))
 
 options = PoseLandmarkerOptions(
@@ -42,7 +64,12 @@ with PoseLandmarker.create_from_options(options) as landmarker:
         if not ret:
             break
         frame=cv2.flip(frame,1)
-        rgb_frame= cv2.cvtColor(frame,cv2.COLOR_BGR2RGB) 
+        rgb_frame= cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
+        
+        if posture_status:
+            cv2.putText(frame,"GOOD POSTURE",(50,50),cv2.FONT_HERSHEY_SIMPLEX,0.5,(0,255,0),2) 
+        else:
+            cv2.putText(frame,"BAD POSTURE",(50,50),cv2.FONT_HERSHEY_SIMPLEX,0.5,(0,0,255),2) 
         cv2.imshow("Webcam",frame)
         mp_image= mp.Image(image_format=mp.ImageFormat.SRGB, data= rgb_frame)
         current_time= time.time()
