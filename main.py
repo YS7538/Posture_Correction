@@ -21,10 +21,12 @@ forward_lean=0
 bad_posture_start=None
 alert= False
 
-Base_path= Path(__file__).parent
-Sound_file= Base_path/"beep.mp3"
+base_path= Path(__file__).parent
+sound_file= base_path/"beep.mp3"
+forward_high_threshold=-0.10
+forward_low_threshold=-0.30
 # Create a pose landmarker instance with the live stream mode:
-def print_result(result: PoseLandmarkerResult, output_image: mp.Image, timestamp_ms: int):
+def process_result(result: PoseLandmarkerResult, output_image: mp.Image, timestamp_ms: int):
     if(result.pose_landmarks):
         global forward_lean,posture_status,bad_posture_start,alert
         
@@ -32,10 +34,10 @@ def print_result(result: PoseLandmarkerResult, output_image: mp.Image, timestamp
         right_ear= person[8]
         right_shoulder= person[12]
         
-        side_lean= right_ear.x-right_shoulder.x
+        side_lean= right_ear.x-right_shoulder.x # Might add in future
         forward_lean= right_ear.z-right_shoulder.z
         
-        if forward_lean>-0.10 or forward_lean<-0.30:
+        if forward_lean>forward_high_threshold or forward_lean<forward_low_threshold:
             posture_status=False
             if bad_posture_start==None:
                 bad_posture_start=time.time()
@@ -47,15 +49,15 @@ def print_result(result: PoseLandmarkerResult, output_image: mp.Image, timestamp
         
         if bad_posture_start is not None:
             elapsed= time.time()- bad_posture_start
-            if elapsed>4 and not alert:
-                playsound(str(Sound_file))
+            if elapsed>4 and not alert:  # if bad posture remains for more than 4 seconds and alert aint activated already
+                playsound(str(sound_file))
                 alert=True
     #print('pose landmarker result: {}'.format(result))
 
 options = PoseLandmarkerOptions(
     base_options=BaseOptions(model_asset_path=model_path),
     running_mode=VisionRunningMode.LIVE_STREAM,
-    result_callback=print_result)
+    result_callback=process_result)
 
 with PoseLandmarker.create_from_options(options) as landmarker:
     cap= cv2.VideoCapture(0)
