@@ -4,6 +4,7 @@ import time
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 from playsound import playsound
+from pathlib import Path
 
 
 
@@ -19,16 +20,16 @@ posture_status=True #true means good status
 forward_lean=0
 bad_posture_start=None
 alert= False
+
+Base_path= Path(__file__).parent
+Sound_file= Base_path/"beep.mp3"
 # Create a pose landmarker instance with the live stream mode:
 def print_result(result: PoseLandmarkerResult, output_image: mp.Image, timestamp_ms: int):
     if(result.pose_landmarks):
         global forward_lean,posture_status,bad_posture_start,alert
         
         person= result.pose_landmarks[0]
-        nose= person[0]
         right_ear= person[8]
-        left_ear= person[7]
-        left_shoulder= person[11]
         right_shoulder= person[12]
         
         side_lean= right_ear.x-right_shoulder.x
@@ -47,7 +48,7 @@ def print_result(result: PoseLandmarkerResult, output_image: mp.Image, timestamp
         if bad_posture_start is not None:
             elapsed= time.time()- bad_posture_start
             if elapsed>4 and not alert:
-                playsound("D:/Projects/Posture_Correction/beep.mp3")
+                playsound(str(Sound_file))
                 alert=True
     #print('pose landmarker result: {}'.format(result))
 
