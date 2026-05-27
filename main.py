@@ -1,6 +1,7 @@
 import mediapipe as mp 
 import cv2
 import time
+import numpy as np
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 from playsound import playsound
@@ -23,12 +24,16 @@ alert= False
 
 base_path= Path(__file__).parent
 sound_file= base_path/"beep.mp3"
-forward_high_threshold=-0.10
-forward_low_threshold=-0.30
+forward_high_threshold=0
+forward_low_threshold=0
+calibration_flag=False
+leans=[]
+calibration_start_time=None
+calibration_elapsed=0
 # Create a pose landmarker instance with the live stream mode:
 def process_result(result: PoseLandmarkerResult, output_image: mp.Image, timestamp_ms: int):
     if(result.pose_landmarks):
-        global forward_lean,posture_status,bad_posture_start,alert
+        global forward_lean,posture_status,bad_posture_start,alert,forward_high_threshold,forward_low_threshold,calibration_flag,leans,calibration_start_time,calibration_elapsed
         
         person= result.pose_landmarks[0]
         right_ear= person[8]
@@ -37,7 +42,29 @@ def process_result(result: PoseLandmarkerResult, output_image: mp.Image, timesta
         side_lean= right_ear.x-right_shoulder.x # Might add in future
         forward_lean= right_ear.z-right_shoulder.z
         
-        if forward_lean>forward_high_threshold or forward_lean<forward_low_threshold:
+        if not calibration_flag:
+
+            # first calibration frame
+            if calibration_start_time is None:
+                calibration_start_time = time.time()
+
+            # collect one sample THIS frame
+            leans.append(forward_lean)
+
+            # check elapsed calibration time
+            calibration_elapsed = time.time() - calibration_start_time
+
+            if calibration_elapsed > 10:
+
+                lean_arr = np.array(leans)
+                avg_posture = np.mean(lean_arr)
+
+                forward_high_threshold = avg_posture + 0.15
+                forward_low_threshold = avg_posture - 0.15
+
+                calibration_flag = True
+                leans.clear()
+        elif forward_lean>forward_high_threshold or forward_lean<forward_low_threshold:
             posture_status=False
             if bad_posture_start==None:
                 bad_posture_start=time.time()
@@ -54,6 +81,7 @@ def process_result(result: PoseLandmarkerResult, output_image: mp.Image, timesta
                 alert=True
     #print('pose landmarker result: {}'.format(result))
 
+
 options = PoseLandmarkerOptions(
     base_options=BaseOptions(model_asset_path=model_path),
     running_mode=VisionRunningMode.LIVE_STREAM,
@@ -68,11 +96,14 @@ with PoseLandmarker.create_from_options(options) as landmarker:
             break
         frame=cv2.flip(frame,1)
         rgb_frame= cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
-        
-        if posture_status:
-            cv2.putText(frame,"GOOD POSTURE",(50,50),cv2.FONT_HERSHEY_SIMPLEX,0.5,(0,255,0),2) 
+        remaining= 10 - int(calibration_elapsed)
+        if not calibration_flag:
+            cv2.putText(frame,f"SIT STRAIGHT",(40,50),cv2.FONT_HERSHEY_SIMPLEX,0.5,(0,0,200),2) 
+            cv2.putText(frame,f"Calibrating:{remaining}S",(40,70),cv2.FONT_HERSHEY_SIMPLEX,0.5,(0,0,200),2) 
+        elif posture_status:
+            cv2.putText(frame,"GOOD POSTURE",(40,50),cv2.FONT_HERSHEY_SIMPLEX,0.5,(0,255,0),2) 
         else:
-            cv2.putText(frame,"BAD POSTURE",(50,50),cv2.FONT_HERSHEY_SIMPLEX,0.5,(0,0,255),2) 
+            cv2.putText(frame,"BAD POSTURE",(40,50),cv2.FONT_HERSHEY_SIMPLEX,0.5,(0,0,255),2) 
         cv2.imshow("Webcam",frame)
         mp_image= mp.Image(image_format=mp.ImageFormat.SRGB, data= rgb_frame)
         current_time= time.time()
@@ -81,7 +112,6 @@ with PoseLandmarker.create_from_options(options) as landmarker:
         if cv2.waitKey(1) & 0xFF== ord('q'):
             break
     
-        
     cap.release()
     cv2.destroyAllWindows()
 
