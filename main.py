@@ -2,6 +2,7 @@ import mediapipe as mp
 import cv2
 import time
 import numpy as np
+import threading
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 from playsound import playsound
@@ -30,17 +31,38 @@ calibration_flag=False
 leans=[]
 calibration_start_time=None
 calibration_elapsed=0
+head_offset_threshold = 0.05
+shoulder_tilt_threshold = 0.03
+
+#SOUND CALL FUNCTION
+
+def play_sound():
+    playsound(str(sound_file))
 # Create a pose landmarker instance with the live stream mode:
 def process_result(result: PoseLandmarkerResult, output_image: mp.Image, timestamp_ms: int):
     if(result.pose_landmarks):
         global forward_lean,posture_status,bad_posture_start,alert,forward_high_threshold,forward_low_threshold,calibration_flag,leans,calibration_start_time,calibration_elapsed
         
-        person= result.pose_landmarks[0]
-        right_ear= person[8]
-        right_shoulder= person[12]
+        person = result.pose_landmarks[0]
+
+        # landmarks
+        nose = person[0]
+
+        left_ear = person[7]
+        right_ear = person[8]
+
+        left_shoulder = person[11]
+        right_shoulder = person[12]
+
+        # FORWARD LEAN
+        forward_lean = right_ear.z - right_shoulder.z
         
-        side_lean= right_ear.x-right_shoulder.x # Might add in future
-        forward_lean= right_ear.z-right_shoulder.z
+        # SIDE HEAD LEAN
+        shoulder_mid_x = (left_shoulder.x + right_shoulder.x) / 2
+        head_offset = nose.x - shoulder_mid_x
+
+        # SHOULDER TILT
+        shoulder_tilt = abs(left_shoulder.y - right_shoulder.y)
         
         if not calibration_flag:
 
@@ -64,7 +86,12 @@ def process_result(result: PoseLandmarkerResult, output_image: mp.Image, timesta
 
                 calibration_flag = True
                 leans.clear()
-        elif forward_lean>forward_high_threshold or forward_lean<forward_low_threshold:
+        elif (
+            forward_lean > forward_high_threshold
+            or forward_lean < forward_low_threshold
+            or abs(head_offset) > head_offset_threshold
+            or shoulder_tilt > shoulder_tilt_threshold
+        ):
             posture_status=False
             if bad_posture_start==None:
                 bad_posture_start=time.time()
@@ -77,7 +104,7 @@ def process_result(result: PoseLandmarkerResult, output_image: mp.Image, timesta
         if bad_posture_start is not None:
             elapsed= time.time()- bad_posture_start
             if elapsed>4 and not alert:  # if bad posture remains for more than 4 seconds and alert aint activated already
-                playsound(str(sound_file))
+                threading.Thread(target=play_sound).start()
                 alert=True
     #print('pose landmarker result: {}'.format(result))
 
