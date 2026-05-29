@@ -173,19 +173,150 @@ This project helped reinforce:
 * Documentation through README files
 * Tracking project progress through version control
 
-## Key Takeaway
+## Packaging, Deployment & Distribution Learnings
 
-The biggest lesson from this project was that building a real application teaches concepts much more effectively than simply reading about them.
+After the posture detection system was completed, the next challenge was turning the project into a standalone desktop application.
 
-Through a single project, I gained practical experience with:
+This phase introduced an entirely different set of engineering problems unrelated to posture detection itself.
 
-* Computer Vision
-* Real-Time Processing
-* State Management
-* Threading
-* Debugging
-* Calibration Systems
-* Software Packaging Preparation
-* Git and GitHub Workflows
+### PyInstaller Fundamentals
 
-This project transformed from a simple posture detector into a complete learning experience in designing and building real-world software systems.
+Learned how PyInstaller packages:
+
+* Python interpreter
+* Source code
+* Dependencies
+
+into a standalone executable.
+
+Key concepts explored:
+
+* Build process
+* One-file executables
+* Build artifacts
+* Dependency collection
+* Application distribution
+
+### Dependency Packaging Issues
+
+The first executable build failed with:
+
+```text
+ModuleNotFoundError: No module named 'mediapipe.tasks.c'
+```
+
+This revealed that some MediaPipe components were not automatically discovered by PyInstaller.
+
+The issue was resolved by using:
+
+```bash
+pyinstaller --collect-all mediapipe
+```
+
+which forced PyInstaller to include all MediaPipe resources.
+
+### Asset Packaging Problems
+
+After fixing MediaPipe packaging, the executable failed again because:
+
+```text
+pose_landmarker_full.task
+```
+
+could not be found.
+
+This highlighted an important distinction:
+
+* Python code is packaged automatically.
+* External assets are not.
+
+The solution was to explicitly include project assets using:
+
+```bash
+--add-data
+```
+
+during the build process.
+
+### Runtime Path Handling
+
+A major lesson was learning that:
+
+```python
+Path(__file__).parent
+```
+
+works during development but behaves differently inside packaged executables.
+
+This led to learning how PyInstaller extracts files into temporary runtime directories and how to access bundled resources correctly using:
+
+```python
+sys._MEIPASS
+```
+
+A reusable `resource_path()` helper function was implemented to support both development and packaged environments.
+
+### Pathlib Compatibility
+
+During refactoring, MediaPipe produced an error because it expected string paths while `pathlib` returned `Path` objects.
+
+This reinforced the importance of understanding:
+
+* Path objects
+* String conversion
+* Third-party library expectations
+
+The issue was resolved using:
+
+```python
+str(path)
+```
+
+when required.
+
+### Git & Deployment Mistakes
+
+While preparing deployment commits, large build artifacts were accidentally committed:
+
+```text
+dist/
+build/
+main.exe
+```
+
+This caused GitHub to reject pushes because packaged executables exceeded the 100 MB repository file limit.
+
+Lessons learned:
+
+* Build artifacts should never be committed.
+* `.gitignore` is essential.
+* Generated files and source code should remain separate.
+* Always review `git status` before committing.
+
+### Final Result
+
+Successfully created a standalone executable that:
+
+* Launches without Python installed
+* Loads MediaPipe correctly
+* Loads project assets correctly
+* Performs calibration
+* Detects posture
+* Plays audio alerts
+
+The executable was tested outside the project directory and functioned correctly, confirming that dependency and asset packaging were successful.
+
+### Key Takeaway
+
+Building the application was only half the challenge.
+
+Making the application portable, distributable, and executable on another system required learning:
+
+* Packaging
+* Dependency management
+* Resource handling
+* Deployment workflows
+* Git best practices
+
+This deployment phase provided as many engineering lessons as the original computer vision implementation itself.
+
