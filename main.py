@@ -3,16 +3,25 @@ import cv2
 import time
 import numpy as np
 import threading
+import sys
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 from playsound import playsound
 from pathlib import Path
 
 
-assets_path= Path(__file__).parent/"assets"
+def resource_path(relative_path): #Path error handling for packaging using sys
+    try:
+        base_path = Path(sys._MEIPASS)
+    except AttributeError:
+        base_path = Path(__file__).parent
 
-model_path= assets_path/"pose_landmarker_full.task"
-sound_file= assets_path/"beep.mp3"
+    return base_path / relative_path
+
+
+
+sound_file = resource_path("assets/beep.mp3")
+model_path = resource_path("assets/pose_landmarker_full.task")
 
 BaseOptions = mp.tasks.BaseOptions
 PoseLandmarker = mp.tasks.vision.PoseLandmarker
