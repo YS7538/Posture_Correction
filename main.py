@@ -9,8 +9,10 @@ from playsound import playsound
 from pathlib import Path
 
 
+assets_path= Path(__file__).parent/"assets"
 
-model_path= "pose_landmarker_full.task"
+model_path= assets_path/"pose_landmarker_full.task"
+sound_file= assets_path/"beep.mp3"
 
 BaseOptions = mp.tasks.BaseOptions
 PoseLandmarker = mp.tasks.vision.PoseLandmarker
@@ -23,8 +25,6 @@ forward_lean=0
 bad_posture_start=None
 alert= False
 
-base_path= Path(__file__).parent
-sound_file= base_path/"beep.mp3"
 forward_high_threshold=0
 forward_low_threshold=0
 calibration_flag=False
@@ -33,6 +33,8 @@ calibration_start_time=None
 calibration_elapsed=0
 head_offset_threshold = 0.05
 shoulder_tilt_threshold = 0.03
+calibration_time=10
+alert_delay=4
 
 #SOUND CALL FUNCTION
 
@@ -76,7 +78,7 @@ def process_result(result: PoseLandmarkerResult, output_image: mp.Image, timesta
             # check elapsed calibration time
             calibration_elapsed = time.time() - calibration_start_time
 
-            if calibration_elapsed > 10:
+            if calibration_elapsed > calibration_time:
 
                 lean_arr = np.array(leans)
                 avg_posture = np.mean(lean_arr)
@@ -103,14 +105,14 @@ def process_result(result: PoseLandmarkerResult, output_image: mp.Image, timesta
         
         if bad_posture_start is not None:
             elapsed= time.time()- bad_posture_start
-            if elapsed>4 and not alert:  # if bad posture remains for more than 4 seconds and alert aint activated already
+            if elapsed>alert_delay and not alert:  # if bad posture remains for more than 4 seconds and alert aint activated already
                 threading.Thread(target=play_sound).start()
                 alert=True
     #print('pose landmarker result: {}'.format(result))
 
 
 options = PoseLandmarkerOptions(
-    base_options=BaseOptions(model_asset_path=model_path),
+    base_options=BaseOptions(model_asset_path=str(model_path)),
     running_mode=VisionRunningMode.LIVE_STREAM,
     result_callback=process_result)
 
