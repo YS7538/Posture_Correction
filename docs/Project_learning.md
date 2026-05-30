@@ -145,17 +145,6 @@ This led to learning:
 * Library compatibility issues
 * Converting paths using `str(path)` when required
 
-### Future Deployment Goals
-
-Planned deployment improvements include:
-
-* Creating a standalone executable
-* Running as a background utility
-* System tray integration
-* Startup on boot
-* Cross-device portability
-* Simplified installation process
-
 ### Key Lesson
 
 Building a working application is only part of software development.
