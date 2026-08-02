@@ -1,207 +1,143 @@
 # Posture Correction Utility
 
-A real-time posture monitoring application built using **MediaPipe**, **OpenCV**, and **Python**.
+**A real-time, personalized posture coach powered by computer vision.**
 
-The application uses computer vision to monitor posture through a webcam and alerts the user when poor posture is detected for an extended period of time.
+Posture Correction Utility turns a standard webcam into a lightweight ergonomic feedback system. It uses MediaPipe Pose Landmarker to observe key upper-body landmarks, learns an individual's neutral sitting position during a short calibration, and delivers a timely audio cue when poor posture persists.
 
-> This project is currently under active development. Desktop packaging and background execution support are planned next.
+Built as a desktop-focused Python application, the project pairs a responsive OpenCV camera experience with an asynchronous pose-detection pipeline—making posture feedback immediate without interrupting the video feed.
 
----
+## Why it matters
 
-## Features
+Poor posture is usually gradual and easy to miss during focused work. This utility provides a subtle, real-time reminder before a brief slouch becomes a habit. Rather than relying on a one-size-fits-all threshold, it establishes a personal baseline first, which makes feedback more relevant to the person using it.
 
-### Real-Time Posture Detection
+## Highlights
 
-Uses MediaPipe Pose Landmarker to continuously track body landmarks through a webcam feed.
+- **Personalized 10-second calibration** establishes a forward-lean baseline from live landmark samples.
+- **Multi-signal posture analysis** combines forward head position, lateral head offset, and shoulder asymmetry.
+- **Real-time asynchronous inference** uses MediaPipe's live-stream callback model to keep webcam processing responsive.
+- **Persistent-posture alerting** waits until poor posture lasts beyond the configured delay, avoiding noisy frame-by-frame warnings.
+- **Non-blocking audio feedback** runs alert playback on a separate thread so the camera view remains fluid.
+- **Portable desktop packaging support** resolves bundled model and audio assets correctly in both source and PyInstaller environments.
 
-### Personalized Calibration
-
-The application performs a calibration phase when started.
-
-During calibration:
-
-* The user sits in their ideal posture
-* Forward lean measurements are collected
-* A personalized posture baseline is generated
-* Detection thresholds are automatically adjusted
-
-This allows posture monitoring to adapt to different users instead of relying on fixed values.
-
-### Multi-Metric Posture Analysis
-
-The current posture evaluation uses:
-
-#### Forward Lean Detection
-
-Measures the depth difference between:
-
-* Right Ear
-* Right Shoulder
-
-Used to detect slouching forward or backward.
-
-#### Head Offset Detection
-
-Measures horizontal displacement of the nose relative to the midpoint of both shoulders.
-
-Used to detect leaning to one side.
-
-#### Shoulder Tilt Detection
-
-Measures vertical asymmetry between shoulders.
-
-Used to detect uneven posture and side tilting.
-
-### Audio Alerts
-
-If poor posture is maintained for a configurable duration, an audio alert is played to remind the user to correct their posture.
-
-### Threaded Audio Playback
-
-Audio alerts are executed in a separate thread to prevent webcam freezing or UI lag while sounds are being played.
-
-### Portable Asset Loading
-
-The project uses `pathlib` to load assets through relative paths, making the project easier to move between systems.
-
----
-
-## Technologies Used
-
-* Python
-* MediaPipe
-* OpenCV
-* NumPy
-* Threading
-* Playsound
-
----
-
-## Project Structure
+## How it works
 
 ```text
-Posture_Correction/
-│
-├── assets/
-│   ├── beep.mp3
-│   └── pose_landmarker_full.task
-│
-├── docs/
-│   ├── LANDMARKS_REFERENCE.md
-│   ├── PROJECT_LEARNINGS.md
-│   └── FUTURE_IMPROVEMENTS.md
-│
-├── main.py
-├── requirements.txt
-├── README.md
-└── .gitignore
+Webcam frame
+    |
+    v
+MediaPipe Pose Landmarker (live stream)
+    |
+    v
+Landmarks: nose, ears, shoulders
+    |
+    +--> Calibration: learn forward-lean baseline
+    |
+    v
+Posture evaluation
+    |-- Forward lean: right ear depth vs. right shoulder depth
+    |-- Head offset: nose position vs. shoulder midpoint
+    `-- Shoulder tilt: vertical difference between shoulders
+    |
+    v
+Poor posture persists past alert delay? --> threaded audio reminder
 ```
 
----
+### Detection logic
 
-## How It Works
+At launch, sit upright and remain in a natural, comfortable position for roughly 10 seconds. The application samples forward lean over that period and calculates an individual baseline. Once calibration is complete, posture is marked as poor when any of the following signals exceeds its threshold:
 
-### Step 1: Calibration
+| Signal | What it identifies |
+| --- | --- |
+| Forward lean | Head moving noticeably forward or backward relative to the calibrated baseline |
+| Head offset | Head drifting sideways from the midpoint of the shoulders |
+| Shoulder tilt | Uneven shoulder height that can indicate a side lean |
 
-When the application starts:
+The alert is intentionally delayed by four seconds by default and plays once per poor-posture episode. Returning to a good posture resets the alert state.
 
-1. Sit in your normal upright posture
-2. Remain still during calibration
-3. The system records posture measurements
-4. Personalized thresholds are generated
+## Tech stack
 
-### Step 2: Monitoring
+- Python
+- MediaPipe Tasks / Pose Landmarker
+- OpenCV
+- NumPy
+- `threading` for responsive alert playback
+- `playsound` for audio feedback
+- PyInstaller-compatible resource handling
 
-After calibration:
+## Quick start
 
-* Landmarks are tracked in real time
-* Posture metrics are calculated
-* Current posture is classified as good or bad
+### Prerequisites
 
-### Step 3: Alerting
+- Python 3.10+ recommended
+- A webcam
+- Windows is the primary tested environment
 
-If bad posture is maintained longer than the configured delay:
-
-* An audio alert is triggered
-* The alert plays only once until posture is corrected
-
----
-
-## Installation
-
-### Clone Repository
+### Install and run
 
 ```bash
 git clone <repository-url>
 cd Posture_Correction
-```
-
-### Create Virtual Environment
-
-```bash
 python -m venv venv
 ```
 
-### Activate Environment
+Activate the environment on Windows:
 
-Windows:
-
-```bash
-venv\Scripts\activate
+```powershell
+venv\Scripts\Activate.ps1
 ```
 
-### Install Dependencies
+Install dependencies and launch the application:
 
 ```bash
 pip install -r requirements.txt
-```
-
-### Run
-
-```bash
 python main.py
 ```
 
----
+When the camera window opens, sit upright for the calibration period. Press `q` while the window is focused to exit.
 
-## Current Limitations
+## Project structure
 
-* Webcam must remain visible to the user
-* Landmark occlusion can reduce accuracy
-* No smoothing/filtering of landmark data yet
-* Desktop packaging is not completed
-* Does not currently run in the system tray or background
+```text
+Posture_Correction/
+|-- assets/
+|   |-- beep.mp3                     # Posture reminder sound
+|   `-- pose_landmarker_full.task    # MediaPipe pose model
+|-- docs/
+|   |-- Future_improvements.md
+|   |-- Project_learning.md
+|   `-- landmarks_reference
+|-- main.py                          # Application entry point and live pipeline
+|-- requirements.txt
+`-- README.md
+```
 
----
+## Packaging
 
-## Future Improvements
+The application includes a `resource_path()` helper that loads assets from the source tree during development and from PyInstaller's temporary bundle directory in a packaged build. This allows the pose model and audio reminder to travel with the application instead of depending on machine-specific paths.
 
-* System tray integration
-* Startup on boot
-* Executable packaging with PyInstaller
-* Background monitoring mode
-* Landmark confidence filtering
-* Temporal smoothing
-* Posture analytics dashboard
-* Daily posture statistics
-* Multiple user profiles
+For MediaPipe-based builds, ensure the package resources and the `assets` directory are included in the PyInstaller command. Build output is intentionally excluded from version control.
 
----
+## Current scope and considerations
 
-## Key Learnings
+- Webcam visibility, adequate lighting, and unobstructed landmarks improve detection quality.
+- The current version evaluates a single detected person and is designed for seated desktop use.
+- Detection thresholds for head offset and shoulder tilt are fixed; forward lean is personalized through calibration.
+- The project does not yet include background/system-tray operation, analytics, or automated tests.
 
-This project was built primarily as a learning exercise in:
+## Roadmap
 
-* Computer Vision
-* MediaPipe
-* Real-Time Systems
-* Threading
-* Event-Driven Programming
-* Software Architecture
-* Debugging and Performance Optimization
+- Configurable sensitivity, alert delay, and sounds
+- Landmark confidence filtering and temporal smoothing
+- One-click recalibration and user profiles
+- System-tray/background mode and desktop notifications
+- Session insights and posture analytics
+- Modular architecture and automated test coverage
 
----
+## Documentation
+
+- [Project learnings](docs/Project_learning.md) — engineering notes from developing the computer-vision and packaging pipeline.
+- [Future improvements](docs/Future_improvements.md) — planned enhancements for detection, UX, and maintainability.
 
 ## License
 
-This project is currently provided for educational and personal use.
+Provided for educational and personal use.
